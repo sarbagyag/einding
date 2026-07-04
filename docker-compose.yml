@@ -38,6 +38,13 @@ services:
       - "traefik.http.routers.einding.tls.certresolver=le"
       - "traefik.http.services.einding.loadbalancer.server.port=8080"
       - "traefik.docker.network=proxy"
+      # Redirect plain-HTTP hits on port 80 to HTTPS (ACME challenges are
+      # handled by Traefik before routers, so this doesn't break cert renewal).
+      - "traefik.http.routers.einding-http.rule=Host(`einding.mandalafoods.co`)"
+      - "traefik.http.routers.einding-http.entrypoints=web"
+      - "traefik.http.routers.einding-http.middlewares=einding-https-redirect"
+      - "traefik.http.middlewares.einding-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.einding-https-redirect.redirectscheme.permanent=true"
 
 networks:
   proxy:
