@@ -140,7 +140,7 @@ export default function App() {
         </SidePanel>
       )}
       {openPanel === 'news' && (
-        <SidePanel title="News Digest" onClose={() => setOpenPanel(null)}>
+        <SidePanel title="News Digest" onClose={() => setOpenPanel(null)} wide>
           <NewsPanel />
         </SidePanel>
       )}

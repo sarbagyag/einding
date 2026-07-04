@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 
 const AUTO_HIDE_MS = 90_000
 
-export default function SidePanel({ title, onClose, children }) {
+export default function SidePanel({ title, onClose, children, wide = false }) {
   const panelRef = useRef(null)
 
   // Hidden by default, revealed on click — and self-closes after a stretch
@@ -56,7 +56,11 @@ export default function SidePanel({ title, onClose, children }) {
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-6 py-8 sm:px-10">
-        <div className="mx-auto w-full max-w-2xl animate-[einding-rise-in_0.25s_ease-out]">
+        <div
+          className={`mx-auto w-full animate-[einding-rise-in_0.25s_ease-out] ${
+            wide ? 'max-w-none' : 'max-w-2xl'
+          }`}
+        >
           {children}
         </div>
       </div>
