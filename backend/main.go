@@ -48,7 +48,10 @@ func main() {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.Handle("GET /api/tasks", s.auth(http.HandlerFunc(s.handleListTasks)))
 	mux.Handle("POST /api/tasks", s.auth(http.HandlerFunc(s.handleCreateTask)))
+	mux.Handle("PUT /api/tasks/order", s.auth(http.HandlerFunc(s.handleReorderTasks)))
+	mux.Handle("PATCH /api/tasks/{id}", s.auth(http.HandlerFunc(s.handleRenameTask)))
 	mux.Handle("DELETE /api/tasks/{id}", s.auth(http.HandlerFunc(s.handleDeleteTask)))
+	mux.Handle("GET /api/tasks/{id}/sessions", s.auth(http.HandlerFunc(s.handleListSessions)))
 	mux.Handle("POST /api/tasks/{id}/sessions", s.auth(http.HandlerFunc(s.handleCreateSession)))
 
 	fileServer := http.FileServer(http.Dir(staticDir))

@@ -16,8 +16,16 @@ body,
 
 body {
   font-family: 'Inter', sans-serif;
+  /* Flat #0f0f0f with a faint violet wash at the top for depth. */
+  background:
+    radial-gradient(900px 500px at 50% -100px, rgba(124, 106, 247, 0.07), transparent 70%),
+    #0f0f0f;
   /* Keep content clear of the notch / home indicator when installed as a PWA. */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(124, 106, 247, 0.35);
 }

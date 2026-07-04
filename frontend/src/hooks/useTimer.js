@@ -7,17 +7,19 @@ export const PRESETS = {
 }
 
 const ACTIVE_TASK_KEY = 'einding:activeTaskId'
-const TIMER_STATE_KEY = 'einding:timerState'
+// v2: v1 states could carry a pomodoro countdown into stopwatch mode,
+// inflating logged time — discard them rather than migrate.
+const TIMER_STATE_KEY = 'einding:timerState:v2'
 
-function freshTimerState(overrides = {}) {
+function freshTimerState({ mode = 'pomodoro', preset = '90/15' } = {}) {
   return {
-    mode: 'pomodoro',
-    preset: '90/15',
+    mode,
+    preset,
     phase: 'work',
     startedAt: null,
-    secondsAtStart: PRESETS['90/15'].work,
+    // Stopwatch counts up from zero; pomodoro counts down from the preset.
+    secondsAtStart: mode === 'normal' ? 0 : PRESETS[preset].work,
     isRunning: false,
-    ...overrides,
   }
 }
 
@@ -28,7 +30,11 @@ function loadActiveTaskId() {
 function loadTimerState() {
   try {
     const raw = localStorage.getItem(TIMER_STATE_KEY)
-    return raw ? JSON.parse(raw) : freshTimerState()
+    const state = raw ? JSON.parse(raw) : null
+    if (!state || !PRESETS[state.preset] || !['pomodoro', 'normal'].includes(state.mode)) {
+      return freshTimerState()
+    }
+    return state
   } catch {
     return freshTimerState()
   }
@@ -151,7 +157,7 @@ export function useTimer({ onWorkSessionComplete, onPhaseComplete }) {
   }, [])
 
   const setPreset = useCallback((preset) => {
-    setTimerState(() => freshTimerState({ preset }))
+    setTimerState((prev) => freshTimerState({ mode: prev.mode, preset }))
   }, [])
 
   // Manually ends the current run (e.g. stopwatch "finish"), logging whatever

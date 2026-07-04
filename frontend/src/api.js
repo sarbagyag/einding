@@ -20,7 +20,11 @@ async function request(path, options = {}) {
 export const api = {
   listTasks: () => request('/tasks'),
   createTask: (name) => request('/tasks', { method: 'POST', body: JSON.stringify({ name }) }),
+  renameTask: (id, name) =>
+    request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  reorderTasks: (ids) => request('/tasks/order', { method: 'PUT', body: JSON.stringify({ ids }) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
+  listSessions: (taskId) => request(`/tasks/${taskId}/sessions`),
   logSession: (taskId, session) =>
     request(`/tasks/${taskId}/sessions`, { method: 'POST', body: JSON.stringify(session) }),
 }

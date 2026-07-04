@@ -26,13 +26,13 @@ export default function Timer({ timer }) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-5">
       <div className="flex gap-1 rounded-lg bg-bg p-1">
         {['pomodoro', 'normal'].map((mode) => (
           <button
             key={mode}
             onClick={() => setMode(mode)}
-            className={`rounded-md px-3 py-1 text-sm capitalize transition ${
+            className={`rounded-md px-3.5 py-1 text-sm capitalize transition ${
               timerState.mode === mode
                 ? 'bg-accent text-white'
                 : 'text-muted hover:text-primary'
@@ -51,7 +51,7 @@ export default function Timer({ timer }) {
               onClick={() => setPreset(preset)}
               className={`rounded-md px-2.5 py-1 font-mono text-xs transition ${
                 timerState.preset === preset
-                  ? 'border border-accent bg-accent/20 text-accent'
+                  ? 'border border-accent/70 bg-accent/15 text-accent'
                   : 'border border-transparent text-muted hover:text-primary'
               }`}
             >
@@ -61,22 +61,21 @@ export default function Timer({ timer }) {
         </div>
       )}
 
-      <div className="flex h-4 items-center">
-        {isBreak ? (
-          <span className="text-xs uppercase tracking-widest text-success">Break</span>
-        ) : (
-          isPomodoro && (
-            <span className="text-xs uppercase tracking-widest text-muted">Focus</span>
-          )
-        )}
-      </div>
-
-      <div
-        className={`font-mono text-6xl font-semibold tabular-nums sm:text-7xl ${
-          isBreak ? 'text-success' : 'text-primary'
-        }`}
-      >
-        {formatClock(value)}
+      <div className="flex flex-col items-center gap-1">
+        <span
+          className={`text-xs font-medium uppercase tracking-widest ${
+            isBreak ? 'text-success' : 'text-muted'
+          }`}
+        >
+          {isPomodoro ? (isBreak ? 'Break' : 'Focus') : 'Elapsed'}
+        </span>
+        <div
+          className={`font-mono text-6xl font-semibold tabular-nums tracking-tight sm:text-7xl ${
+            isBreak ? 'text-success' : 'text-primary'
+          }`}
+        >
+          {formatClock(value)}
+        </div>
       </div>
 
       {isPomodoro && (
@@ -94,14 +93,14 @@ export default function Timer({ timer }) {
         {!timerState.isRunning ? (
           <button
             onClick={handleStart}
-            className="min-w-28 rounded-lg bg-accent px-6 py-2 font-medium text-white transition hover:brightness-110"
+            className="min-w-28 rounded-xl bg-accent px-7 py-2.5 font-medium text-white transition hover:brightness-110"
           >
             {accruedSeconds > 0 || isBreak ? 'Resume' : 'Start'}
           </button>
         ) : (
           <button
             onClick={pause}
-            className="min-w-28 rounded-lg bg-bg px-6 py-2 font-medium text-primary transition hover:brightness-150"
+            className="min-w-28 rounded-xl bg-bg px-7 py-2.5 font-medium text-primary transition hover:brightness-150"
           >
             Pause
           </button>
@@ -110,7 +109,7 @@ export default function Timer({ timer }) {
         {isBreak ? (
           <button
             onClick={skipBreak}
-            className="rounded-lg border border-muted/40 px-6 py-2 font-medium text-muted transition hover:border-muted/70 hover:text-primary"
+            className="rounded-xl border border-white/10 px-6 py-2.5 font-medium text-muted transition hover:border-white/25 hover:text-primary"
           >
             Skip break
           </button>
@@ -118,7 +117,7 @@ export default function Timer({ timer }) {
           accruedSeconds > 0 && (
             <button
               onClick={finishAndReset}
-              className="rounded-lg border border-muted/40 px-6 py-2 font-medium text-muted transition hover:border-muted/70 hover:text-primary"
+              className="rounded-xl border border-white/10 px-6 py-2.5 font-medium text-muted transition hover:border-white/25 hover:text-primary"
             >
               End &amp; log
             </button>

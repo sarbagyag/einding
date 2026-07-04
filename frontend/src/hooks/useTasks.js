@@ -48,6 +48,31 @@ export function useTasks() {
     return created
   }, [])
 
+  const renameTask = useCallback(async (id, name) => {
+    const updated = await api.renameTask(id, name)
+    setTasks((prev) => {
+      const next = prev.map((t) => (t.id === updated.id ? updated : t))
+      saveCache(next)
+      return next
+    })
+  }, [])
+
+  // Swaps the task with its neighbor; the new order is applied locally first
+  // and synced to the server in the background.
+  const moveTask = useCallback(
+    (id, direction) => {
+      const idx = tasks.findIndex((t) => t.id === id)
+      const target = idx + direction
+      if (idx < 0 || target < 0 || target >= tasks.length) return Promise.resolve()
+      const next = [...tasks]
+      ;[next[idx], next[target]] = [next[target], next[idx]]
+      setTasks(next)
+      saveCache(next)
+      return api.reorderTasks(next.map((t) => t.id))
+    },
+    [tasks],
+  )
+
   const deleteTask = useCallback(async (id) => {
     await api.deleteTask(id)
     setTasks((prev) => {
@@ -67,5 +92,5 @@ export function useTasks() {
     return updatedTask
   }, [])
 
-  return { tasks, isOffline, createTask, deleteTask, logSession }
+  return { tasks, isOffline, createTask, renameTask, moveTask, deleteTask, logSession }
 }

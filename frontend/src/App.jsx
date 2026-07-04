@@ -4,10 +4,10 @@ import TaskList from './components/TaskList'
 import { useTasks } from './hooks/useTasks'
 import { useTimer } from './hooks/useTimer'
 import { playBeep } from './beep'
-import { formatClock } from './format'
+import { formatClock, formatHours } from './format'
 
 export default function App() {
-  const { tasks, isOffline, createTask, deleteTask, logSession } = useTasks()
+  const { tasks, isOffline, createTask, renameTask, moveTask, deleteTask, logSession } = useTasks()
   const [notice, setNotice] = useState(null)
   const noticeTimeoutRef = useRef(null)
 
@@ -32,6 +32,7 @@ export default function App() {
   })
 
   const activeTask = tasks.find((t) => t.id === timer.activeTaskId) || null
+  const totalInvested = tasks.reduce((sum, t) => sum + t.totalSeconds, 0)
 
   // Keep the countdown visible in the tab title while the timer runs, so a
   // backgrounded tab still tells you where you stand at a glance.
@@ -67,19 +68,40 @@ export default function App() {
     }
   }
 
+  const handleRename = async (taskId, name) => {
+    try {
+      await renameTask(taskId, name)
+    } catch {
+      showNotice("Couldn't rename the task — check your connection.")
+    }
+  }
+
+  const handleMove = (taskId, direction) => {
+    moveTask(taskId, direction).catch(() =>
+      showNotice("Couldn't save the new order — check your connection."),
+    )
+  }
+
   return (
-    <div className="mx-auto min-h-full max-w-2xl px-4 py-8 sm:px-6">
-      <header className="mb-8 flex items-baseline justify-between">
+    <div className="mx-auto min-h-full max-w-xl px-4 py-8 sm:py-12">
+      <header className="mb-8 flex items-baseline justify-between px-1">
         <h1 className="text-xl font-semibold tracking-tight text-primary">
           Einding<span className="text-accent">.</span>
         </h1>
-        {isOffline && (
-          <span className="rounded-full bg-surface px-3 py-1 text-xs text-muted">Offline</span>
-        )}
+        <div className="flex items-baseline gap-3">
+          {totalInvested > 0 && (
+            <span className="font-mono text-sm text-muted">{formatHours(totalInvested)} total</span>
+          )}
+          {isOffline && (
+            <span className="rounded-full border border-white/[0.08] bg-surface px-3 py-1 text-xs text-muted">
+              Offline
+            </span>
+          )}
+        </div>
       </header>
 
       {notice && (
-        <div className="mb-4 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+        <div className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
           {notice}
         </div>
       )}
@@ -92,6 +114,8 @@ export default function App() {
         onDoNow={handleDoNow}
         onDelete={handleDelete}
         onCreate={handleCreate}
+        onRename={handleRename}
+        onMove={handleMove}
       />
     </div>
   )
