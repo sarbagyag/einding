@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ActiveTask from './components/ActiveTask'
 import TaskList from './components/TaskList'
+import Quote from './components/Quote'
 import { useTasks } from './hooks/useTasks'
 import { useTimer } from './hooks/useTimer'
 import { playBeep } from './beep'
@@ -117,6 +118,8 @@ export default function App() {
         onRename={handleRename}
         onMove={handleMove}
       />
+
+      <Quote />
     </div>
   )
 }
