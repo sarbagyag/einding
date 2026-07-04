@@ -92,7 +92,7 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-full max-w-[1400px] px-4 py-8 sm:py-12 lg:px-10">
-      <header className="mb-8 flex items-baseline justify-between px-1 lg:mb-10">
+      <header className="mb-8 flex items-baseline justify-between border-b border-white/[0.06] px-1 pb-6 lg:mb-10 lg:pb-8">
         <h1 className="text-xl font-semibold tracking-tight text-primary">
           Einding<span className="text-accent">.</span>
         </h1>

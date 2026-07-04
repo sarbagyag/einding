@@ -73,17 +73,20 @@ export default function NewsPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <div className="flex flex-1 gap-1 rounded-lg bg-bg p-1">
+      <div className="flex items-center justify-between border-b border-white/[0.06]">
+        <div className="flex gap-6">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setCategory(tab.key)}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm transition ${
-                category === tab.key ? 'bg-accent text-white' : 'text-muted hover:text-primary'
+              className={`relative pb-3 text-sm font-medium transition ${
+                category === tab.key ? 'text-primary' : 'text-muted hover:text-primary'
               }`}
             >
               {tab.label}
+              {category === tab.key && (
+                <span aria-hidden className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent" />
+              )}
             </button>
           ))}
         </div>
@@ -92,9 +95,10 @@ export default function NewsPanel() {
           disabled={refreshing}
           aria-label="Fetch fresh news now"
           title="Fetch fresh news now"
-          className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-muted transition hover:border-accent/50 hover:text-primary disabled:cursor-wait disabled:opacity-50"
+          className="mb-2.5 flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-sm text-muted transition hover:border-accent/50 hover:text-primary disabled:cursor-wait disabled:opacity-50"
         >
-          {refreshing ? '…' : '↻'}
+          <span>{refreshing ? '…' : '↻'}</span>
+          <span className="hidden sm:inline">Refresh</span>
         </button>
       </div>
 

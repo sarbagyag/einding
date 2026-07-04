@@ -40,9 +40,9 @@ export default function VocabReview() {
   }
   if (queue.length === 0) {
     return (
-      <div className="py-8 text-center">
-        <p className="font-medium text-primary/80">All caught up</p>
-        <p className="mt-1 text-sm text-muted">
+      <div className="py-16 text-center">
+        <p className="text-lg font-medium text-primary/80">All caught up</p>
+        <p className="mt-1.5 text-sm text-muted">
           {reviewedCount > 0 ? `${reviewedCount} reviewed. ` : ''}Nothing due right now.
         </p>
       </div>
@@ -52,23 +52,23 @@ export default function VocabReview() {
   const card = queue[0]
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <p className="font-mono text-xs text-muted">{queue.length} due</p>
 
-      <div className="rounded-xl border border-white/[0.06] bg-bg p-5 text-center">
-        <p className="text-2xl font-semibold text-primary">{card.word}</p>
-        {card.type && <p className="mt-1 text-xs uppercase tracking-widest text-muted">{card.type}</p>}
+      <div className="rounded-2xl border border-white/[0.06] bg-bg px-6 py-10 text-center sm:px-10 sm:py-14">
+        <p className="text-3xl font-semibold text-primary sm:text-4xl">{card.word}</p>
+        {card.type && <p className="mt-2 text-xs uppercase tracking-widest text-muted">{card.type}</p>}
 
         {revealed ? (
-          <div className="mt-4 flex flex-col gap-2 border-t border-white/[0.06] pt-4 text-left">
-            <p className="text-primary/90">{card.english}</p>
-            {card.exampleDe && <p className="text-sm italic text-muted">{card.exampleDe}</p>}
+          <div className="mx-auto mt-6 flex max-w-md flex-col gap-2.5 border-t border-white/[0.06] pt-6 text-left">
+            <p className="text-lg text-primary/90">{card.english}</p>
+            {card.exampleDe && <p className="text-base italic text-muted">{card.exampleDe}</p>}
             {card.exampleEn && <p className="text-sm text-muted">{card.exampleEn}</p>}
           </div>
         ) : (
           <button
             onClick={() => setRevealed(true)}
-            className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:brightness-110"
+            className="mt-6 rounded-lg bg-accent px-5 py-2.5 font-medium text-white transition hover:brightness-110"
           >
             Show answer
           </button>
@@ -76,12 +76,12 @@ export default function VocabReview() {
       </div>
 
       {revealed && (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="mx-auto grid w-full max-w-md grid-cols-4 gap-2.5">
           {RATINGS.map((r) => (
             <button
               key={r.value}
               onClick={() => rate(r.value)}
-              className={`rounded-lg py-2 text-xs font-medium transition ${r.className}`}
+              className={`rounded-lg py-2.5 text-sm font-medium transition ${r.className}`}
             >
               {r.label}
             </button>
