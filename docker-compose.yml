@@ -25,6 +25,8 @@ services:
     environment:
       DATABASE_URL: postgres://einding:${POSTGRES_PASSWORD}@db:5432/einding?sslmode=disable
       EINDING_API_TOKEN: ${EINDING_API_TOKEN}
+      N8N_GLOBAL_NEWS_REFRESH_URL: ${N8N_GLOBAL_NEWS_REFRESH_URL:-}
+      N8N_NEPALI_NEWS_REFRESH_URL: ${N8N_NEPALI_NEWS_REFRESH_URL:-}
     depends_on:
       - db
     restart: unless-stopped

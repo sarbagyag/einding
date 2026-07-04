@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ActiveTask from './components/ActiveTask'
 import TaskList from './components/TaskList'
 import Quote from './components/Quote'
+import SideTriggers from './components/SideTriggers'
+import SidePanel from './components/SidePanel'
+import VocabReview from './components/VocabReview'
+import NewsPanel from './components/NewsPanel'
 import { useTasks } from './hooks/useTasks'
 import { useTimer } from './hooks/useTimer'
 import { playBeep } from './beep'
@@ -11,6 +15,9 @@ export default function App() {
   const { tasks, isOffline, createTask, renameTask, moveTask, deleteTask, logSession } = useTasks()
   const [notice, setNotice] = useState(null)
   const noticeTimeoutRef = useRef(null)
+  // Which distraction panel is open — hidden by default, shown on click,
+  // auto-hidden again by SidePanel after a stretch of inactivity.
+  const [openPanel, setOpenPanel] = useState(null)
 
   const showNotice = useCallback((message) => {
     setNotice(message)
@@ -120,6 +127,19 @@ export default function App() {
       />
 
       <Quote />
+
+      <SideTriggers onOpen={setOpenPanel} />
+
+      {openPanel === 'vocab' && (
+        <SidePanel title="German Vocab" onClose={() => setOpenPanel(null)}>
+          <VocabReview />
+        </SidePanel>
+      )}
+      {openPanel === 'news' && (
+        <SidePanel title="News Digest" onClose={() => setOpenPanel(null)}>
+          <NewsPanel />
+        </SidePanel>
+      )}
     </div>
   )
 }

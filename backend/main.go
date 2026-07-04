@@ -12,9 +12,11 @@ import (
 )
 
 type server struct {
-	db        *db
-	apiToken  string
-	staticDir string
+	db              *db
+	apiToken        string
+	staticDir       string
+	newsRefreshURLs map[string]string
+	httpClient      *http.Client
 }
 
 func main() {
@@ -32,6 +34,17 @@ func main() {
 		staticDir = "frontend/dist"
 	}
 
+	// Optional: only set once the matching n8n webhook exists for that
+	// category. Missing here just means "refresh" 502s for that category
+	// instead of failing the whole app at startup.
+	newsRefreshURLs := map[string]string{}
+	if url := os.Getenv("N8N_GLOBAL_NEWS_REFRESH_URL"); url != "" {
+		newsRefreshURLs["global"] = url
+	}
+	if url := os.Getenv("N8N_NEPALI_NEWS_REFRESH_URL"); url != "" {
+		newsRefreshURLs["nepali"] = url
+	}
+
 	pool, err := newPool(ctx, databaseURL)
 	if err != nil {
 		log.Fatalf("connecting to database: %v", err)
@@ -42,7 +55,15 @@ func main() {
 		log.Fatalf("running migrations: %v", err)
 	}
 
-	s := &server{db: &db{pool: pool}, apiToken: apiToken, staticDir: staticDir}
+	s := &server{
+		db:              &db{pool: pool},
+		apiToken:        apiToken,
+		staticDir:       staticDir,
+		newsRefreshURLs: newsRefreshURLs,
+		// RSS reads across ~9 feeds plus an LLM summarization can genuinely
+		// take a while — generous timeout so a slow run doesn't 500 early.
+		httpClient: &http.Client{Timeout: 60 * time.Second},
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.handleHealth)
@@ -53,6 +74,12 @@ func main() {
 	mux.Handle("DELETE /api/tasks/{id}", s.auth(http.HandlerFunc(s.handleDeleteTask)))
 	mux.Handle("GET /api/tasks/{id}/sessions", s.auth(http.HandlerFunc(s.handleListSessions)))
 	mux.Handle("POST /api/tasks/{id}/sessions", s.auth(http.HandlerFunc(s.handleCreateSession)))
+	mux.Handle("POST /api/vocab/words", s.auth(http.HandlerFunc(s.handleIngestVocabWords)))
+	mux.Handle("GET /api/vocab/due", s.auth(http.HandlerFunc(s.handleListDueVocabCards)))
+	mux.Handle("POST /api/vocab/cards/{id}/review", s.auth(http.HandlerFunc(s.handleReviewVocabCard)))
+	mux.Handle("POST /api/news", s.auth(http.HandlerFunc(s.handleIngestNews)))
+	mux.Handle("GET /api/news", s.auth(http.HandlerFunc(s.handleListNews)))
+	mux.Handle("POST /api/news/refresh", s.auth(http.HandlerFunc(s.handleRefreshNews)))
 
 	fileServer := http.FileServer(http.Dir(staticDir))
 	mux.Handle("/", spaHandler(staticDir, fileServer))

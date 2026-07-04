@@ -29,3 +29,21 @@ body {
 ::selection {
   background: rgba(124, 106, 247, 0.35);
 }
+
+@keyframes einding-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes einding-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
