@@ -35,21 +35,21 @@ export default function SidePanel({ title, onClose, children }) {
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-6">
       <div
         aria-hidden
         onClick={onClose}
-        className="absolute inset-0 animate-[einding-fade-in_0.15s_ease-out] bg-black/60 backdrop-blur-[2px]"
+        className="absolute inset-0 animate-[einding-fade-in_0.15s_ease-out] bg-black/70 backdrop-blur-sm"
       />
       <div
         ref={panelRef}
         role="dialog"
         aria-label={title}
         aria-modal="true"
-        className="relative flex h-full w-full animate-[einding-slide-in_0.2s_ease-out] flex-col border-l border-white/10 bg-surface shadow-2xl sm:w-[420px]"
+        className="relative flex h-full w-full animate-[einding-modal-in_0.18s_ease-out] flex-col bg-surface shadow-2xl sm:h-auto sm:max-h-[85vh] sm:w-full sm:max-w-lg sm:rounded-2xl sm:border sm:border-white/10"
       >
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
-          <h2 className="font-medium text-primary">{title}</h2>
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+          <h2 className="text-lg font-medium text-primary">{title}</h2>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -58,7 +58,7 @@ export default function SidePanel({ title, onClose, children }) {
             &times;
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
       </div>
     </div>
   )

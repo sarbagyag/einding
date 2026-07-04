@@ -91,8 +91,8 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto min-h-full max-w-xl px-4 py-8 sm:py-12">
-      <header className="mb-8 flex items-baseline justify-between px-1">
+    <div className="mx-auto min-h-full max-w-[1400px] px-4 py-8 sm:py-12 lg:px-10">
+      <header className="mb-8 flex items-baseline justify-between px-1 lg:mb-10">
         <h1 className="text-xl font-semibold tracking-tight text-primary">
           Einding<span className="text-accent">.</span>
         </h1>
@@ -114,17 +114,21 @@ export default function App() {
         </div>
       )}
 
-      <ActiveTask task={activeTask} timer={timer} />
+      <div className="lg:grid lg:grid-cols-[420px_1fr] lg:items-start lg:gap-8">
+        <div className="lg:sticky lg:top-10">
+          <ActiveTask task={activeTask} timer={timer} />
+        </div>
 
-      <TaskList
-        tasks={tasks}
-        activeTaskId={timer.activeTaskId}
-        onDoNow={handleDoNow}
-        onDelete={handleDelete}
-        onCreate={handleCreate}
-        onRename={handleRename}
-        onMove={handleMove}
-      />
+        <TaskList
+          tasks={tasks}
+          activeTaskId={timer.activeTaskId}
+          onDoNow={handleDoNow}
+          onDelete={handleDelete}
+          onCreate={handleCreate}
+          onRename={handleRename}
+          onMove={handleMove}
+        />
+      </div>
 
       <Quote />
 

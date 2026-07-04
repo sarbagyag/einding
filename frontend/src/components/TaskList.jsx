@@ -21,7 +21,7 @@ export default function TaskList({
   }
 
   return (
-    <section className="mt-10">
+    <section className="mt-10 lg:mt-0">
       <div className="mb-3 flex items-baseline justify-between px-1">
         <h2 className="text-xs font-medium uppercase tracking-widest text-muted">Tasks</h2>
         {tasks.length > 0 && (
@@ -45,7 +45,9 @@ export default function TaskList({
         </button>
       </form>
 
-      <div className="flex flex-col gap-2">
+      {/* Capped height on desktop so ~5-6 tasks are visible at once without
+          growing the whole page — the list scrolls internally past that. */}
+      <div className="flex flex-col gap-2 lg:max-h-[34rem] lg:overflow-y-auto lg:pr-1">
         {tasks.length === 0 && (
           <p className="py-8 text-center text-sm text-muted">No tasks yet — add one above.</p>
         )}

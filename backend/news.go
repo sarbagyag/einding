@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 )
@@ -83,10 +85,13 @@ func (s *server) handleIngestNews(w http.ResponseWriter, r *http.Request) {
 
 // handleRefreshNews triggers the matching n8n workflow on demand (the
 // Webhook node added alongside the Schedule Trigger / Telegram /news
-// command) and relays its response back. The digest also gets saved to
-// Postgres independently, via the same n8n run's existing HTTP Request node
-// that already POSTs to handleIngestNews — this handler doesn't write
-// anything itself, it only triggers and reports back what came out.
+// command). The workflow itself can take several minutes (RSS reads across
+// several feeds plus an LLM summarization) and writes the finished digest to
+// Postgres itself, via the same HTTP Request node that already POSTs to
+// handleIngestNews — so rather than hold the client's request open for all
+// of that, this handler fires the trigger in the background and reports
+// back immediately. The client picks up the result by polling GET
+// /api/news, same as it would for the scheduled runs.
 func (s *server) handleRefreshNews(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Category string `json:"category"`
@@ -106,37 +111,30 @@ func (s *server) handleRefreshNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, webhookURL, bytes.NewReader(nil))
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to build refresh request")
-		return
-	}
-	req.Header.Set("Authorization", "Bearer "+s.apiToken)
-	req.Header.Set("Content-Type", "application/json")
+	category := body.Category
+	go func() {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, webhookURL, bytes.NewReader(nil))
+		if err != nil {
+			log.Printf("news refresh (%s): building request: %v", category, err)
+			return
+		}
+		req.Header.Set("Authorization", "Bearer "+s.apiToken)
+		req.Header.Set("Content-Type", "application/json")
 
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, "failed to reach the news workflow")
-		return
-	}
-	defer resp.Body.Close()
+		resp, err := s.httpClient.Do(req)
+		if err != nil {
+			log.Printf("news refresh (%s): %v", category, err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			log.Printf("news refresh (%s): workflow responded with status %d", category, resp.StatusCode)
+		}
+	}()
 
-	if resp.StatusCode >= 300 {
-		writeError(w, http.StatusBadGateway, "news workflow returned an error")
-		return
-	}
-
-	var n8nResponse struct {
-		Message string `json:"message"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&n8nResponse); err != nil || n8nResponse.Message == "" {
-		writeError(w, http.StatusBadGateway, "news workflow returned an unexpected response")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{
-		"category": body.Category,
-		"message":  n8nResponse.Message,
+	writeJSON(w, http.StatusAccepted, map[string]string{
+		"category": category,
+		"status":   "triggered",
 	})
 }
 

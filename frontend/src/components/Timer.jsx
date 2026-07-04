@@ -70,7 +70,7 @@ export default function Timer({ timer }) {
           {isPomodoro ? (isBreak ? 'Break' : 'Focus') : 'Elapsed'}
         </span>
         <div
-          className={`font-mono text-6xl font-semibold tabular-nums tracking-tight sm:text-7xl ${
+          className={`font-mono text-6xl font-semibold tabular-nums tracking-tight sm:text-7xl lg:text-6xl ${
             isBreak ? 'text-success' : 'text-primary'
           }`}
         >

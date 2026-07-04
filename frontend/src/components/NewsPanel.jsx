@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { renderDigest } from '../markdown'
 import { formatDay, formatTime } from '../format'
@@ -8,14 +8,25 @@ const TABS = [
   { key: 'nepali', label: 'Nepali' },
 ]
 
+const POLL_INTERVAL_MS = 15_000
+const POLL_MAX_MS = 6 * 60_000
+
 export default function NewsPanel() {
   const [category, setCategory] = useState('global')
   const [items, setItems] = useState(null)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState(null)
+  const pollRef = useRef(null)
+
+  const stopPolling = useCallback(() => {
+    clearInterval(pollRef.current)
+    pollRef.current = null
+    setRefreshing(false)
+  }, [])
 
   useEffect(() => {
+    stopPolling()
     setItems(null)
     setFailed(false)
     setRefreshError(null)
@@ -23,26 +34,42 @@ export default function NewsPanel() {
       .listNews(category)
       .then(setItems)
       .catch(() => setFailed(true))
-  }, [category])
+    return stopPolling
+  }, [category, stopPolling])
 
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true)
     setRefreshError(null)
     try {
-      // The n8n workflow's ingest branch writes the same digest to Postgres
-      // in parallel with this response, so rather than race a refetch
-      // against that write, show the returned message immediately.
-      const result = await api.refreshNews(category)
-      setItems((prev) => [
-        { id: `local-${Date.now()}`, category, message: result.message, createdAt: new Date().toISOString() },
-        ...(prev || []),
-      ])
+      // The n8n workflow can take several minutes (RSS reads + an LLM
+      // summarization) before it writes the digest to Postgres itself, so
+      // we only wait for the trigger to be accepted, then poll for the
+      // fresh item to show up rather than holding this request open.
+      await api.refreshNews(category)
     } catch (err) {
-      setRefreshError(err.message || 'Refresh failed — check your connection.')
-    } finally {
-      setRefreshing(false)
+      setRefreshError(err.message || 'Could not trigger a refresh — check your connection.')
+      return
     }
-  }, [category])
+
+    const knownNewestId = items?.[0]?.id ?? null
+    const startedAt = Date.now()
+    setRefreshing(true)
+    clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      if (Date.now() - startedAt > POLL_MAX_MS) {
+        stopPolling()
+        return
+      }
+      try {
+        const fresh = await api.listNews(category)
+        if (fresh[0]?.id !== knownNewestId) {
+          setItems(fresh)
+          stopPolling()
+        }
+      } catch {
+        // transient — keep polling until POLL_MAX_MS gives up above
+      }
+    }, POLL_INTERVAL_MS)
+  }, [category, items, stopPolling])
 
   return (
     <div className="flex flex-col gap-4">
@@ -72,7 +99,9 @@ export default function NewsPanel() {
       </div>
 
       {refreshing && (
-        <p className="text-xs text-muted">Fetching fresh news — this can take up to a minute&hellip;</p>
+        <p className="text-xs text-muted">
+          Triggered — this can take a few minutes. We&rsquo;ll show it here the moment it&rsquo;s ready.
+        </p>
       )}
       {refreshError && <p className="text-sm text-red-300">{refreshError}</p>}
 

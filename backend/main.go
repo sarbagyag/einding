@@ -61,8 +61,10 @@ func main() {
 		staticDir:       staticDir,
 		newsRefreshURLs: newsRefreshURLs,
 		// RSS reads across ~9 feeds plus an LLM summarization can genuinely
-		// take a while — generous timeout so a slow run doesn't 500 early.
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		// take several minutes. handleRefreshNews fires this in the
+		// background and responds to the client immediately, so this only
+		// needs to cap a stuck workflow rather than block anyone's request.
+		httpClient: &http.Client{Timeout: 6 * time.Minute},
 	}
 
 	mux := http.NewServeMux()
