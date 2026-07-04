@@ -1,0 +1,46 @@
+# Deploy alongside the existing services on the Mandala Foods VPS
+# (/opt/traefik, /opt/vikunja). Mirrors the vikunja container's pattern,
+# with its own dedicated Postgres (not shared with vikunja_db).
+services:
+  db:
+    image: postgres:15
+    container_name: einding_db
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: einding
+      POSTGRES_DB: einding
+    volumes:
+      - ./db:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - einding_internal
+
+  einding:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_TOKEN: ${VITE_API_TOKEN}
+    container_name: einding
+    environment:
+      DATABASE_URL: postgres://einding:${POSTGRES_PASSWORD}@db:5432/einding?sslmode=disable
+      EINDING_API_TOKEN: ${EINDING_API_TOKEN}
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - proxy
+      - einding_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.einding.rule=Host(`einding.mandalafoods.co`)"
+      - "traefik.http.routers.einding.entrypoints=websecure"
+      - "traefik.http.routers.einding.tls.certresolver=le"
+      - "traefik.http.services.einding.loadbalancer.server.port=8080"
+      - "traefik.docker.network=proxy"
+
+networks:
+  proxy:
+    external: true
+  einding_internal:
+    driver: bridge
