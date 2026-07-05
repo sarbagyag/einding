@@ -5,7 +5,7 @@ import { Fragment } from 'react'
 // parser, so there's no new dependency to add.
 const TOKEN = /\*([^*]+)\*|_([^_]+)_|\[([^\]]+)\]\(([^)]+)\)/g
 
-function renderLine(line, keyPrefix) {
+export function renderInline(line, keyPrefix) {
   const nodes = []
   let lastIndex = 0
   let match
@@ -36,14 +36,34 @@ function renderLine(line, keyPrefix) {
     lastIndex = TOKEN.lastIndex
   }
   if (lastIndex < line.length) nodes.push(line.slice(lastIndex))
-  return nodes
+  return <Fragment key={keyPrefix}>{nodes}</Fragment>
 }
 
-export function renderDigest(text) {
-  return text.split('\n').map((line, idx) => (
-    <Fragment key={idx}>
-      {idx > 0 && <br />}
-      {renderLine(line, idx)}
-    </Fragment>
-  ))
+// Our digests are always: one title line ("Morning Digest — ..."), then a
+// run of "<category header>" lines each followed by their numbered
+// "<n> headline — [Read](url)" items. A blank line usually separates
+// sections but isn't load-bearing here — a line only counts as an item if
+// it ends in a markdown link, so this holds regardless of spacing and
+// regardless of the link text's language (English "Read", Nepali
+// "पढ्नुस्", ...).
+const ENDS_WITH_LINK = /\]\([^)]+\)\s*$/
+
+export function parseDigestSections(text) {
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) return { title: '', sections: [] }
+
+  const [title, ...rest] = lines
+  const sections = []
+  for (const line of rest) {
+    if (ENDS_WITH_LINK.test(line) && sections.length > 0) {
+      sections[sections.length - 1].items.push(line)
+    } else {
+      sections.push({ header: line, items: [] })
+    }
+  }
+  return { title, sections }
 }

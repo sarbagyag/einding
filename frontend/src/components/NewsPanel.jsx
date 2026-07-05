@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
-import { renderDigest } from '../markdown'
+import { parseDigestSections, renderInline } from '../markdown'
 import { formatDay, formatTime } from '../format'
 
 const TABS = [
@@ -114,20 +114,42 @@ export default function NewsPanel() {
       {!failed && items && items.length === 0 && <p className="text-sm text-muted">No digests yet.</p>}
 
       {!failed && items && items.length > 0 && (
-        <div className="flex flex-col gap-4">
-          {items.map((item, idx) => (
-            <div
-              key={item.id}
-              className={`rounded-xl border border-white/[0.06] p-4 text-sm leading-relaxed ${
-                idx === 0 ? 'bg-bg' : 'bg-bg/40'
-              }`}
-            >
-              <p className="mb-2 font-mono text-xs text-muted">
-                {formatDay(item.createdAt)} &middot; {formatTime(item.createdAt)}
-              </p>
-              <div className="whitespace-pre-wrap text-primary/90">{renderDigest(item.message)}</div>
-            </div>
-          ))}
+        <div className="flex flex-col gap-14">
+          {items.map((item, idx) => {
+            const { title, sections } = parseDigestSections(item.message)
+            return (
+              <div key={item.id} className={idx > 0 ? 'border-t border-white/[0.06] pt-10' : ''}>
+                <p className="mb-1.5 font-mono text-xs text-muted">
+                  {formatDay(item.createdAt)} &middot; {formatTime(item.createdAt)}
+                </p>
+                {title && (
+                  <p className="mb-6 text-lg font-semibold text-primary sm:text-xl">
+                    {renderInline(title, `${item.id}-title`)}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {sections.map((section, sIdx) => (
+                    <div
+                      key={sIdx}
+                      className="rounded-2xl border border-white/[0.06] bg-bg p-5 transition hover:border-white/[0.12]"
+                    >
+                      {section.header && (
+                        <p className="mb-3 border-b border-white/[0.06] pb-3 text-sm">
+                          {renderInline(section.header, `${item.id}-${sIdx}-h`)}
+                        </p>
+                      )}
+                      <div className="flex flex-col gap-2.5 text-sm leading-relaxed text-primary/90">
+                        {section.items.map((line, lIdx) => (
+                          <p key={lIdx}>{renderInline(line, `${item.id}-${sIdx}-${lIdx}`)}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
