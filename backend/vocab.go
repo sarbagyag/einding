@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -158,47 +160,24 @@ func (s *server) handleListDueVocabCards(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, cards)
 }
 
-func (s *server) handleReviewVocabCard(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func validVocabRating(rating int8) bool {
+	return rating >= int8(fsrs.Again) && rating <= int8(fsrs.Easy)
+}
 
-	var body struct {
-		Rating int8 `json:"rating"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if body.Rating < int8(fsrs.Again) || body.Rating > int8(fsrs.Easy) {
-		writeError(w, http.StatusBadRequest, "rating must be 1 (Again), 2 (Hard), 3 (Good), or 4 (Easy)")
-		return
-	}
-
-	ctx := r.Context()
-	tx, err := s.db.pool.Begin(ctx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to start transaction")
-		return
-	}
-	defer tx.Rollback(ctx)
-
+// applyVocabReview loads card `id` with a row lock, advances its FSRS
+// schedule for the given rating, and logs the review — all within tx so
+// callers can batch several reviews into one atomic commit.
+func applyVocabReview(ctx context.Context, tx pgx.Tx, id string, rating int8) (vocabCard, error) {
 	existing, err := scanVocabCard(tx.QueryRow(ctx,
 		`select `+vocabCardColumns+` from einding.vocab_cards where id = $1 for update`,
 		id,
 	))
 	if err != nil {
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			writeError(w, http.StatusNotFound, "card not found")
-		case pgErrorCode(err) == pgInvalidTextRepresentation:
-			writeError(w, http.StatusBadRequest, "invalid card id")
-		default:
-			writeError(w, http.StatusInternalServerError, "failed to load card")
-		}
-		return
+		return vocabCard{}, err
 	}
 
 	now := time.Now()
-	result := vocabScheduler.Next(existing.toFSRSCard(), now, fsrs.Rating(body.Rating))
+	result := vocabScheduler.Next(existing.toFSRSCard(), now, fsrs.Rating(rating))
 
 	var lastReview *time.Time
 	if !result.Card.LastReview.IsZero() {
@@ -217,8 +196,7 @@ func (s *server) handleReviewVocabCard(w http.ResponseWriter, r *http.Request) {
 		lastReview, id,
 	))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update card")
-		return
+		return vocabCard{}, err
 	}
 
 	if _, err := tx.Exec(ctx,
@@ -227,8 +205,141 @@ func (s *server) handleReviewVocabCard(w http.ResponseWriter, r *http.Request) {
 		id, int16(result.ReviewLog.Rating), int16(result.ReviewLog.State),
 		int64(result.ReviewLog.ElapsedDays), int64(result.ReviewLog.ScheduledDays),
 	); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to log review")
+		return vocabCard{}, err
+	}
+
+	return updated, nil
+}
+
+func (s *server) handleReviewVocabCard(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var body struct {
+		Rating int8 `json:"rating"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
+	}
+	if !validVocabRating(body.Rating) {
+		writeError(w, http.StatusBadRequest, "rating must be 1 (Again), 2 (Hard), 3 (Good), or 4 (Easy)")
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := s.db.pool.Begin(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to start transaction")
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	updated, err := applyVocabReview(ctx, tx, id, body.Rating)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			writeError(w, http.StatusNotFound, "card not found")
+		case pgErrorCode(err) == pgInvalidTextRepresentation:
+			writeError(w, http.StatusBadRequest, "invalid card id")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to update card")
+		}
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to commit review")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (s *server) handleListVocabPool(w http.ResponseWriter, r *http.Request) {
+	count := 5
+	if raw := r.URL.Query().Get("count"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil {
+			count = n
+		}
+	}
+	if count < 2 {
+		count = 2
+	}
+	if count > 20 {
+		count = 20
+	}
+
+	rows, err := s.db.pool.Query(r.Context(),
+		`select `+vocabCardColumns+`
+		 from einding.vocab_cards
+		 order by due asc
+		 limit $1`,
+		count,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list vocab pool")
+		return
+	}
+	defer rows.Close()
+
+	cards := []vocabCard{}
+	for rows.Next() {
+		c, err := scanVocabCard(rows)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to read cards")
+			return
+		}
+		cards = append(cards, c)
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list vocab pool")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, cards)
+}
+
+func (s *server) handleReviewVocabGame(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Results []struct {
+			CardID string `json:"cardId"`
+			Rating int8   `json:"rating"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(body.Results) == 0 || len(body.Results) > 50 {
+		writeError(w, http.StatusBadRequest, "results must contain between 1 and 50 entries")
+		return
+	}
+	for _, res := range body.Results {
+		if !validVocabRating(res.Rating) {
+			writeError(w, http.StatusBadRequest, "rating must be 1 (Again), 2 (Hard), 3 (Good), or 4 (Easy)")
+			return
+		}
+	}
+
+	ctx := r.Context()
+	tx, err := s.db.pool.Begin(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to start transaction")
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	updated := []vocabCard{}
+	for _, res := range body.Results {
+		card, err := applyVocabReview(ctx, tx, res.CardID, res.Rating)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) || pgErrorCode(err) == pgInvalidTextRepresentation {
+				continue
+			}
+			writeError(w, http.StatusInternalServerError, "failed to update card")
+			return
+		}
+		updated = append(updated, card)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

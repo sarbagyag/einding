@@ -27,6 +27,9 @@ export const api = {
   listSessions: (taskId) => request(`/tasks/${taskId}/sessions`),
   logSession: (taskId, session) =>
     request(`/tasks/${taskId}/sessions`, { method: 'POST', body: JSON.stringify(session) }),
+  poolVocab: (count = 5) => request(`/vocab/pool?count=${count}`),
+  reviewVocabBatch: (results) =>
+    request('/vocab/reviews/batch', { method: 'POST', body: JSON.stringify({ results }) }),
   listNews: (category) => request(`/news?category=${category}`),
   refreshNews: (category) =>
     request('/news/refresh', { method: 'POST', body: JSON.stringify({ category }) }),
