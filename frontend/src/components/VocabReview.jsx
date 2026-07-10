@@ -1,8 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api } from '../api'
 import MatchGame from './MatchGame'
 
 export default function VocabReview() {
   const [playing, setPlaying] = useState(false)
+  const [highScore, setHighScore] = useState(null)
+
+  useEffect(() => {
+    api
+      .vocabHighScore()
+      .then(({ highScore: hs }) => setHighScore(hs))
+      .catch(() => {})
+  }, [])
 
   if (playing) {
     return (
@@ -24,6 +33,9 @@ export default function VocabReview() {
         <p className="text-3xl">🎯</p>
         <p className="mt-4 text-lg font-medium text-primary/80">Quick Match</p>
         <p className="mt-1.5 text-sm text-muted">60-second matching game. Updates your FSRS schedule.</p>
+        {highScore !== null && (
+          <p className="mt-2 font-mono text-xs uppercase tracking-widest text-muted">Best {highScore}</p>
+        )}
         <button
           onClick={() => setPlaying(true)}
           className="mt-6 rounded-lg bg-accent px-5 py-2.5 font-medium text-white transition hover:brightness-110"

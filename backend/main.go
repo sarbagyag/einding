@@ -81,6 +81,8 @@ func main() {
 	mux.Handle("GET /api/vocab/pool", s.auth(http.HandlerFunc(s.handleListVocabPool)))
 	mux.Handle("POST /api/vocab/cards/{id}/review", s.auth(http.HandlerFunc(s.handleReviewVocabCard)))
 	mux.Handle("POST /api/vocab/reviews/batch", s.auth(http.HandlerFunc(s.handleReviewVocabGame)))
+	mux.Handle("GET /api/vocab/games/highscore", s.auth(http.HandlerFunc(s.handleGetVocabHighScore)))
+	mux.Handle("POST /api/vocab/games/rounds", s.auth(http.HandlerFunc(s.handleRecordVocabGameRound)))
 	mux.Handle("POST /api/news", s.auth(http.HandlerFunc(s.handleIngestNews)))
 	mux.Handle("GET /api/news", s.auth(http.HandlerFunc(s.handleListNews)))
 	mux.Handle("POST /api/news/refresh", s.auth(http.HandlerFunc(s.handleRefreshNews)))

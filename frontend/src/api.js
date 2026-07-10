@@ -30,6 +30,9 @@ export const api = {
   poolVocab: (count = 5) => request(`/vocab/pool?count=${count}`),
   reviewVocabBatch: (results) =>
     request('/vocab/reviews/batch', { method: 'POST', body: JSON.stringify({ results }) }),
+  vocabHighScore: () => request('/vocab/games/highscore'),
+  recordVocabGameRound: (score) =>
+    request('/vocab/games/rounds', { method: 'POST', body: JSON.stringify({ score }) }),
   listNews: (category) => request(`/news?category=${category}`),
   refreshNews: (category) =>
     request('/news/refresh', { method: 'POST', body: JSON.stringify({ category }) }),

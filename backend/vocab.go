@@ -310,8 +310,8 @@ func (s *server) handleReviewVocabGame(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if len(body.Results) == 0 || len(body.Results) > 50 {
-		writeError(w, http.StatusBadRequest, "results must contain between 1 and 50 entries")
+	if len(body.Results) == 0 || len(body.Results) > 300 {
+		writeError(w, http.StatusBadRequest, "results must contain between 1 and 300 entries")
 		return
 	}
 	for _, res := range body.Results {
