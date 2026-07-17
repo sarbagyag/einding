@@ -7,18 +7,21 @@ export const PRESETS = {
 }
 
 const ACTIVE_TASK_KEY = 'einding:activeTaskId'
-// v2: v1 states could carry a pomodoro countdown into stopwatch mode,
-// inflating logged time — discard them rather than migrate.
-const TIMER_STATE_KEY = 'einding:timerState:v2'
+// v3: adds the 'countdown' mode and its customSeconds field — older states
+// don't carry a valid customSeconds, so discard rather than migrate.
+const TIMER_STATE_KEY = 'einding:timerState:v3'
 
-function freshTimerState({ mode = 'pomodoro', preset = '90/15' } = {}) {
+const DEFAULT_CUSTOM_SECONDS = 25 * 60
+
+function freshTimerState({ mode = 'pomodoro', preset = '90/15', customSeconds = DEFAULT_CUSTOM_SECONDS } = {}) {
   return {
     mode,
     preset,
+    customSeconds,
     phase: 'work',
     startedAt: null,
-    // Stopwatch counts up from zero; pomodoro counts down from the preset.
-    secondsAtStart: mode === 'normal' ? 0 : PRESETS[preset].work,
+    // Stopwatch counts up from zero; pomodoro and countdown count down.
+    secondsAtStart: mode === 'normal' ? 0 : mode === 'countdown' ? customSeconds : PRESETS[preset].work,
     isRunning: false,
   }
 }
@@ -31,7 +34,12 @@ function loadTimerState() {
   try {
     const raw = localStorage.getItem(TIMER_STATE_KEY)
     const state = raw ? JSON.parse(raw) : null
-    if (!state || !PRESETS[state.preset] || !['pomodoro', 'normal'].includes(state.mode)) {
+    if (
+      !state ||
+      !PRESETS[state.preset] ||
+      !['pomodoro', 'normal', 'countdown'].includes(state.mode) ||
+      !(Number.isFinite(state.customSeconds) && state.customSeconds > 0)
+    ) {
       return freshTimerState()
     }
     return state
@@ -61,13 +69,16 @@ export function closeoutSession(state, now = Date.now()) {
       durationSeconds: elapsed,
     }
   }
-  if (state.phase === 'work') {
-    const workTotal = PRESETS[state.preset].work
+  if (state.mode === 'countdown' || state.phase === 'work') {
+    // Countdown's total is its own configured length; pomodoro's is the
+    // preset's work length. Either way it's stable across pause/resume,
+    // unlike secondsAtStart which mutates on every pause.
+    const total = state.mode === 'countdown' ? state.customSeconds : PRESETS[state.preset].work
     const remaining = computeValue(state, now)
-    // Clamp to the preset length: if the tab was closed and reopened long
-    // after the phase ended, only the pomodoro itself counts as work — and it
-    // ended when the countdown hit zero, not when the tab came back.
-    const worked = Math.floor(Math.min(workTotal, workTotal - remaining))
+    // Clamp to the total: if the tab was closed and reopened long after the
+    // countdown ended, only the timer itself counts as work — and it ended
+    // when the countdown hit zero, not when the tab came back.
+    const worked = Math.floor(Math.min(total, total - remaining))
     if (worked <= 0) return null
     const endMs = remaining < 0 ? now + remaining * 1000 : now
     return {
@@ -102,17 +113,24 @@ export function useTimer({ onWorkSessionComplete, onPhaseComplete }) {
     return () => clearInterval(id)
   }, [timerState.isRunning])
 
-  // Handle pomodoro phase completion (work -> break -> work ...).
+  // Handle countdown completion — either a pomodoro phase flip
+  // (work -> break -> work ...) or a one-shot custom timer ringing out.
   useEffect(() => {
-    if (timerState.mode !== 'pomodoro' || !timerState.isRunning) return
+    if ((timerState.mode !== 'pomodoro' && timerState.mode !== 'countdown') || !timerState.isRunning) return
     const remaining = computeValue(timerState)
     if (remaining > 0 || completingRef.current) return
 
     completingRef.current = true
     const now = Date.now()
-    onPhaseComplete?.(timerState.phase)
+    onPhaseComplete?.(timerState.mode === 'countdown' ? 'countdown' : timerState.phase)
 
-    if (timerState.phase === 'work') {
+    if (timerState.mode === 'countdown') {
+      const session = closeoutSession(timerState, now)
+      if (session && activeTaskId && onWorkSessionComplete) {
+        onWorkSessionComplete(activeTaskId, session)
+      }
+      setTimerState((prev) => freshTimerState({ mode: prev.mode, preset: prev.preset, customSeconds: prev.customSeconds }))
+    } else if (timerState.phase === 'work') {
       const session = closeoutSession(timerState, now)
       if (session && activeTaskId && onWorkSessionComplete) {
         onWorkSessionComplete(activeTaskId, session)
@@ -152,12 +170,18 @@ export function useTimer({ onWorkSessionComplete, onPhaseComplete }) {
 
   const setMode = useCallback((mode) => {
     setTimerState((prev) =>
-      freshTimerState({ mode, preset: prev.preset }),
+      freshTimerState({ mode, preset: prev.preset, customSeconds: prev.customSeconds }),
     )
   }, [])
 
   const setPreset = useCallback((preset) => {
-    setTimerState((prev) => freshTimerState({ mode: prev.mode, preset }))
+    setTimerState((prev) => freshTimerState({ mode: prev.mode, preset, customSeconds: prev.customSeconds }))
+  }, [])
+
+  // Sets the custom timer's length in whole minutes and (re)arms it, paused.
+  const setCustomDuration = useCallback((minutes) => {
+    const customSeconds = Math.max(1, Math.round(minutes)) * 60
+    setTimerState((prev) => freshTimerState({ mode: prev.mode, preset: prev.preset, customSeconds }))
   }, [])
 
   // Manually ends the current run (e.g. stopwatch "finish"), logging whatever
@@ -167,7 +191,7 @@ export function useTimer({ onWorkSessionComplete, onPhaseComplete }) {
     if (session && activeTaskId && onWorkSessionComplete) {
       onWorkSessionComplete(activeTaskId, session)
     }
-    setTimerState((prev) => freshTimerState({ mode: prev.mode, preset: prev.preset }))
+    setTimerState((prev) => freshTimerState({ mode: prev.mode, preset: prev.preset, customSeconds: prev.customSeconds }))
     return session
   }, [timerState, activeTaskId, onWorkSessionComplete])
 
@@ -175,7 +199,7 @@ export function useTimer({ onWorkSessionComplete, onPhaseComplete }) {
   const skipBreak = useCallback(() => {
     setTimerState((prev) => {
       if (prev.mode !== 'pomodoro' || prev.phase !== 'break') return prev
-      return freshTimerState({ mode: prev.mode, preset: prev.preset })
+      return freshTimerState({ mode: prev.mode, preset: prev.preset, customSeconds: prev.customSeconds })
     })
   }, [])
 
@@ -190,14 +214,14 @@ export function useTimer({ onWorkSessionComplete, onPhaseComplete }) {
         }
       }
       setActiveTaskIdState(newTaskId)
-      setTimerState((prev) => freshTimerState({ mode: prev.mode, preset: prev.preset }))
+      setTimerState((prev) => freshTimerState({ mode: prev.mode, preset: prev.preset, customSeconds: prev.customSeconds }))
     },
     [activeTaskId, timerState, onWorkSessionComplete],
   )
 
   const clearActiveTask = useCallback(() => {
     setActiveTaskIdState(null)
-    setTimerState((prev) => freshTimerState({ mode: prev.mode, preset: prev.preset }))
+    setTimerState((prev) => freshTimerState({ mode: prev.mode, preset: prev.preset, customSeconds: prev.customSeconds }))
   }, [])
 
   const value = computeValue(timerState)
@@ -207,9 +231,11 @@ export function useTimer({ onWorkSessionComplete, onPhaseComplete }) {
   const accruedSeconds =
     timerState.mode === 'normal'
       ? Math.max(0, Math.floor(value))
-      : timerState.phase === 'work'
-        ? Math.min(workTotal, Math.max(0, Math.floor(workTotal - value)))
-        : 0
+      : timerState.mode === 'countdown'
+        ? Math.min(timerState.customSeconds, Math.max(0, Math.floor(timerState.customSeconds - value)))
+        : timerState.phase === 'work'
+          ? Math.min(workTotal, Math.max(0, Math.floor(workTotal - value)))
+          : 0
 
   return {
     activeTaskId,
@@ -220,6 +246,7 @@ export function useTimer({ onWorkSessionComplete, onPhaseComplete }) {
     pause,
     setMode,
     setPreset,
+    setCustomDuration,
     finishAndReset,
     skipBreak,
     switchActiveTask,

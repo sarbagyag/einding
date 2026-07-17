@@ -8,7 +8,8 @@ import VocabReview from './components/VocabReview'
 import NewsPanel from './components/NewsPanel'
 import { useTasks } from './hooks/useTasks'
 import { useTimer } from './hooks/useTimer'
-import { playBeep } from './beep'
+import { playBeep, playAlarm } from './beep'
+import { notify } from './notify'
 import { formatClock, formatHours } from './format'
 
 export default function App() {
@@ -36,7 +37,18 @@ export default function App() {
 
   const timer = useTimer({
     onWorkSessionComplete: handleWorkSessionComplete,
-    onPhaseComplete: () => playBeep(),
+    onPhaseComplete: (phase) => {
+      if (phase === 'countdown') {
+        playAlarm()
+        notify("Time's up", 'Your timer has finished.')
+      } else if (phase === 'work') {
+        playBeep()
+        notify('Focus session done', 'Time for a break.')
+      } else {
+        playBeep()
+        notify('Break over', 'Back to it.')
+      }
+    },
   })
 
   const activeTask = tasks.find((t) => t.id === timer.activeTaskId) || null

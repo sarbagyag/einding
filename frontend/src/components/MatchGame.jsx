@@ -52,7 +52,6 @@ export default function MatchGame() {
   const [submitFailed, setSubmitFailed] = useState(false)
 
   const wrongTimeoutRef = useRef(null)
-  const resultsRef = useRef([]) // {cardId, rating} accumulated across every batch this round
   const roundActiveRef = useRef(true)
   const batchFinalizedRef = useRef(false)
 
@@ -63,13 +62,16 @@ export default function MatchGame() {
       .catch(() => {})
   }, [])
 
-  const recordBatchResults = useCallback((pairsBatch, finalMatched, finalMissed) => {
-    for (const p of pairsBatch) {
-      resultsRef.current.push({
-        cardId: p.id,
-        rating: !finalMatched.has(p.id) ? 1 : finalMissed.has(p.id) ? 2 : 3,
-      })
-    }
+  // Submits this batch's ratings right away (rather than deferring to
+  // end-of-round) so the backend's `due` timestamps are already advanced by
+  // the time the next /vocab/pool fetch happens — otherwise the pool query
+  // keeps re-surfacing the same just-matched cards within the same round.
+  const submitBatchResults = useCallback((pairsBatch, finalMatched, finalMissed) => {
+    const results = pairsBatch.map((p) => ({
+      cardId: p.id,
+      rating: !finalMatched.has(p.id) ? 1 : finalMissed.has(p.id) ? 2 : 3,
+    }))
+    return api.reviewVocabBatch(results)
   }, [])
 
   const loadBatch = useCallback(() => {
@@ -94,7 +96,6 @@ export default function MatchGame() {
     setPhase('loading')
     setSubmitFailed(false)
     setScore(0)
-    resultsRef.current = []
     roundActiveRef.current = true
     loadBatch()
       .then((ok) => {
@@ -113,15 +114,17 @@ export default function MatchGame() {
 
   const endRound = useCallback(() => {
     roundActiveRef.current = false
-    if (!batchFinalizedRef.current) {
-      recordBatchResults(pairs, matchedIds, missedIds)
-    }
     setPhase('summary')
     const finalScore = score
-    Promise.all([api.reviewVocabBatch(resultsRef.current), api.recordVocabGameRound(finalScore)])
-      .then(([, roundResult]) => setHighScore(roundResult.highScore))
+    const pending = batchFinalizedRef.current
+      ? Promise.resolve()
+      : submitBatchResults(pairs, matchedIds, missedIds).catch(() => setSubmitFailed(true))
+
+    pending
+      .then(() => api.recordVocabGameRound(finalScore))
+      .then((roundResult) => setHighScore(roundResult.highScore))
       .catch(() => setSubmitFailed(true))
-  }, [pairs, matchedIds, missedIds, score, recordBatchResults])
+  }, [pairs, matchedIds, missedIds, score, submitBatchResults])
 
   // Countdown — keeps running across batch refills, stops the round at 0.
   useEffect(() => {
@@ -157,9 +160,11 @@ export default function MatchGame() {
       setScore((s) => s + 1)
 
       if (nextMatched.size === pairs.length) {
-        recordBatchResults(pairs, nextMatched, missedIds)
         batchFinalizedRef.current = true
-        loadBatch().catch(() => endRound())
+        submitBatchResults(pairs, nextMatched, missedIds)
+          .catch(() => setSubmitFailed(true))
+          .then(() => loadBatch())
+          .catch(() => endRound())
       }
     } else {
       setMissedIds((prev) => new Set(prev).add(left).add(right))
