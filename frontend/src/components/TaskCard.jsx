@@ -5,12 +5,11 @@ import { formatHours } from '../format'
 function GripIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor">
-      <circle cx="5.5" cy="3.5" r="1.25" />
-      <circle cx="10.5" cy="3.5" r="1.25" />
-      <circle cx="5.5" cy="8" r="1.25" />
-      <circle cx="10.5" cy="8" r="1.25" />
-      <circle cx="5.5" cy="12.5" r="1.25" />
-      <circle cx="10.5" cy="12.5" r="1.25" />
+      <path d="M8 .8 10.9 4H5.1L8 .8Z" />
+      <rect x="2" y="5.6" width="12" height="1.5" rx=".75" />
+      <rect x="2" y="7.75" width="12" height="1.5" rx=".75" />
+      <rect x="2" y="9.9" width="12" height="1.5" rx=".75" />
+      <path d="M8 15.2 5.1 12h5.8L8 15.2Z" />
     </svg>
   )
 }
