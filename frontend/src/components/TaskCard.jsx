@@ -2,18 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import TaskStats from './TaskStats'
 import { formatHours } from '../format'
 
-function Chevron({ up }) {
+function GripIcon() {
   return (
-    <svg
-      viewBox="0 0 12 12"
-      className={`h-3 w-3 ${up ? '' : 'rotate-180'}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2.5 7.5 6 4l3.5 3.5" />
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor">
+      <circle cx="5.5" cy="3.5" r="1.25" />
+      <circle cx="10.5" cy="3.5" r="1.25" />
+      <circle cx="5.5" cy="8" r="1.25" />
+      <circle cx="10.5" cy="8" r="1.25" />
+      <circle cx="5.5" cy="12.5" r="1.25" />
+      <circle cx="10.5" cy="12.5" r="1.25" />
     </svg>
   )
 }
@@ -31,7 +28,13 @@ export default function TaskCard({ task, isActive, isFirst, isLast, onDoNow, onD
   const [editing, setEditing] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [draft, setDraft] = useState(task.name)
+  const [dragging, setDragging] = useState(false)
   const inputRef = useRef(null)
+  const cardRef = useRef(null)
+  // Window-level drag listeners outlive renders, so they read the latest props
+  // through a ref instead of closing over stale ones.
+  const live = useRef({})
+  live.current = { isFirst, isLast, onMove, id: task.id }
 
   // A stray tap shouldn't erase a task and its logged hours — the first tap
   // arms the delete and it disarms itself if not confirmed within 3s.
@@ -44,6 +47,41 @@ export default function TaskCard({ task, isActive, isFirst, isLast, onDoNow, onD
   useEffect(() => {
     if (editing) inputRef.current?.select()
   }, [editing])
+
+  // Press the grip and drag: whenever the pointer leaves the card past its top
+  // or bottom edge, the task swaps one slot that way and follows the pointer.
+  const startDrag = (e) => {
+    if (e.button !== undefined && e.button !== 0) return
+    e.preventDefault()
+    setDragging(true)
+    const onPointerMove = (ev) => {
+      const rect = cardRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const { isFirst: first, isLast: last, onMove: move, id } = live.current
+      if (ev.clientY < rect.top && !first) move(id, -1)
+      else if (ev.clientY > rect.bottom && !last) move(id, 1)
+    }
+    const stop = () => {
+      setDragging(false)
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', stop)
+      window.removeEventListener('pointercancel', stop)
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
+  }
+
+  // Keyboard fallback: arrow keys on the focused grip shift the task.
+  const handleGripKey = (e) => {
+    if (e.key === 'ArrowUp' && !isFirst) {
+      e.preventDefault()
+      onMove(task.id, -1)
+    } else if (e.key === 'ArrowDown' && !isLast) {
+      e.preventDefault()
+      onMove(task.id, 1)
+    }
+  }
 
   const startEditing = () => {
     setDraft(task.name)
@@ -58,31 +96,26 @@ export default function TaskCard({ task, isActive, isFirst, isLast, onDoNow, onD
 
   return (
     <div
+      ref={cardRef}
       className={`overflow-hidden rounded-xl border transition-colors ${
+        dragging ? 'ring-1 ring-accent/60 ' : ''
+      }${
         isActive
           ? 'border-accent/40 bg-accent/[0.07]'
           : 'border-white/[0.06] bg-surface hover:border-white/[0.12]'
       }`}
     >
       <div className="flex items-center gap-2 py-2.5 pl-2 pr-3 sm:pr-4">
-        <div className="flex shrink-0 flex-col">
-          <button
-            onClick={() => onMove(task.id, -1)}
-            disabled={isFirst}
-            aria-label={`Move ${task.name} up`}
-            className="rounded p-1 text-muted transition hover:text-primary disabled:opacity-25 disabled:hover:text-muted"
-          >
-            <Chevron up />
-          </button>
-          <button
-            onClick={() => onMove(task.id, 1)}
-            disabled={isLast}
-            aria-label={`Move ${task.name} down`}
-            className="rounded p-1 text-muted transition hover:text-primary disabled:opacity-25 disabled:hover:text-muted"
-          >
-            <Chevron up={false} />
-          </button>
-        </div>
+        <button
+          onPointerDown={startDrag}
+          onKeyDown={handleGripKey}
+          aria-label={`Reorder ${task.name} — drag, or use the up and down arrow keys`}
+          className={`shrink-0 touch-none rounded p-1.5 transition hover:text-primary ${
+            dragging ? 'cursor-grabbing text-accent' : 'cursor-grab text-muted'
+          }`}
+        >
+          <GripIcon />
+        </button>
 
         {editing ? (
           <input
